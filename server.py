@@ -28,14 +28,14 @@ from datetime import timedelta
 from typing import Optional
 
 import whisper
-import argostranslate.package
-import argostranslate.translate
 import yt_dlp
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from translation_engines import TranslationService
 
 # ============ CONFIG ============
 BASE_DIR = Path(__file__).resolve().parent
@@ -48,33 +48,7 @@ print(f"🔄 Loading Whisper model '{WHISPER_MODEL_SIZE}'...")
 whisper_model = whisper.load_model(WHISPER_MODEL_SIZE)
 print("✅ Whisper model loaded!")
 
-# ============ ARGOS TRANSLATE SETUP ============
-def setup_argos():
-    print("🔄 Updating Argos Translate language packs...")
-    argostranslate.package.update_package_index()
-    available = argostranslate.package.get_available_packages()
-    print(f"   Found {len(available)} language packs available")
-    return available
-
-available_argos_packages = setup_argos()
-
-
-def ensure_argos_language_pair(source_code: str, target_code: str):
-    installed = argostranslate.translate.get_installed_languages()
-    installed_codes = [lang.code for lang in installed]
-    if source_code in installed_codes and target_code in installed_codes:
-        source_lang = next((l for l in installed if l.code == source_code), None)
-        if source_lang:
-            target_lang_obj = next((l for l in installed if l.code == target_code), None)
-            if source_lang.get_translation(target_lang_obj):
-                return True
-    for pkg in available_argos_packages:
-        if pkg.from_code == source_code and pkg.to_code == target_code:
-            print(f"📦 Installing language pack: {source_code} → {target_code}...")
-            argostranslate.package.install_from_path(pkg.download())
-            print(f"✅ Installed {source_code} → {target_code}")
-            return True
-    return False
+translation_service = TranslationService()
 
 
 # ============ APP ============
@@ -98,14 +72,17 @@ WHISPER_LANGUAGES = {
     "ko": "korean", "zh": "chinese", "ar": "arabic", "hi": "hindi",
     "ru": "russian", "tr": "turkish", "nl": "dutch", "pl": "polish",
     "sv": "swedish", "am": "amharic", "th": "thai", "vi": "vietnamese",
-    "sw": "swahili",
+    "sw": "swahili", "af": "afrikaans", "ha": "hausa", "so": "somali",
+    "yo": "yoruba", "zu": "zulu",
 }
 
 SOURCE_LANG_MAP = {
     "auto": "auto", "en-US": "en", "en-GB": "en", "es-US": "es",
     "fr-FR": "fr", "de-DE": "de", "it-IT": "it", "pt-BR": "pt",
     "ja-JP": "ja", "ko-KR": "ko", "zh-CN": "zh", "ar-SA": "ar",
-    "hi-IN": "hi", "ru-RU": "ru", "tr-TR": "tr",
+    "hi-IN": "hi", "ru-RU": "ru", "tr-TR": "tr", "am-ET": "am",
+    "sw-TZ": "sw", "af-ZA": "af", "ha-NG": "ha", "so-SO": "so",
+    "yo-NG": "yo", "zu-ZA": "zu",
 }
 
 
@@ -129,10 +106,25 @@ async def index():
 
 @app.get("/api/languages")
 async def list_languages():
-    installed = argostranslate.translate.get_installed_languages()
+    installed = translation_service.installed_argos_languages()
     return {
         "installed": [{"code": l.code, "name": l.name} for l in installed],
-        "available_pairs": len(available_argos_packages),
+        "afrinllb": {
+            "enabled_for": [
+                "English ↔ Afrikaans",
+                "English ↔ Amharic",
+                "English ↔ Hausa",
+                "English ↔ Lingala",
+                "English ↔ Somali",
+                "English ↔ Swahili",
+                "English ↔ Wolof",
+                "English ↔ Yoruba",
+                "English ↔ Zulu",
+                "French ↔ Lingala",
+                "French ↔ Wolof",
+            ],
+            "license": "CC-BY-NC-4.0",
+        },
     }
 
 
@@ -347,7 +339,12 @@ async def pipeline_translate(job_id: str, req: ProcessRequest):
     # Step 3: Translate
     update_job(job_id, "translating", 60)
     actual_src = detected_lang if src_code == "auto" else src_code
-    translated = await asyncio.to_thread(translate_segments, segments, actual_src, req.target_language)
+    translated = await asyncio.to_thread(
+        translation_service.translate_segments,
+        segments,
+        actual_src,
+        req.target_language,
+    )
     update_job(job_id, "translating", 85)
 
     # Step 4: Generate subtitles
@@ -581,45 +578,6 @@ def transcribe_audio(audio_path: str, source_lang: str) -> tuple:
         if text:
             segments.append({"start": seg["start"], "end": seg["end"], "text": text})
     return segments, detected
-
-
-# ============ TRANSLATION (Argos) ============
-def translate_segments(segments: list, source_lang: str, target_lang: str) -> list:
-    src = source_lang[:2] if source_lang else "en"
-    tgt = target_lang[:2] if target_lang else "es"
-
-    if src == tgt:
-        return [{"start": s["start"], "end": s["end"], "text": s["text"], "original": s["text"]} for s in segments]
-
-    pair_ok = ensure_argos_language_pair(src, tgt)
-    if not pair_ok and src != "en" and tgt != "en":
-        p1 = ensure_argos_language_pair(src, "en")
-        p2 = ensure_argos_language_pair("en", tgt)
-        if p1 and p2:
-            print(f"🔄 Pivot: {src} → en → {tgt}")
-            en_segs = _do_translate(segments, src, "en")
-            return _do_translate(en_segs, "en", tgt)
-
-    if not pair_ok:
-        print(f"⚠️ Language pair {src} → {tgt} not available.")
-        return [{"start": s["start"], "end": s["end"], "text": s["text"], "original": s["text"]} for s in segments]
-
-    return _do_translate(segments, src, tgt)
-
-
-def _do_translate(segments: list, src: str, tgt: str) -> list:
-    print(f"🌍 Translating {len(segments)} segments: {src} → {tgt}")
-    translated = []
-    for i, seg in enumerate(segments):
-        try:
-            t = argostranslate.translate.translate(seg["text"], src, tgt)
-            translated.append({"start": seg["start"], "end": seg["end"], "text": t, "original": seg["text"]})
-        except Exception as e:
-            translated.append({"start": seg["start"], "end": seg["end"], "text": seg["text"], "original": seg["text"]})
-        if (i + 1) % 10 == 0:
-            print(f"   {i+1}/{len(segments)}...")
-    print("✅ Translation complete!")
-    return translated
 
 
 # ============ SUBTITLE GENERATION ============

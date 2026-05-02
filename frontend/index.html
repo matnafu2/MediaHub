@@ -260,6 +260,13 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-size:18px;font-family:-app
           <option value="ar-SA">Arabic</option>
           <option value="hi-IN">Hindi</option>
           <option value="ru-RU">Russian</option>
+          <option value="am-ET">Amharic</option>
+          <option value="sw-TZ">Swahili</option>
+          <option value="af-ZA">Afrikaans</option>
+          <option value="ha-NG">Hausa</option>
+          <option value="so-SO">Somali</option>
+          <option value="yo-NG">Yoruba</option>
+          <option value="zu-ZA">Zulu</option>
         </select>
       </div>
       <div class="field" id="tgtLangField">
@@ -277,6 +284,14 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-size:18px;font-family:-app
           <option value="ar">Arabic</option>
           <option value="hi">Hindi</option>
           <option value="am">Amharic</option>
+          <option value="af">Afrikaans</option>
+          <option value="ha">Hausa</option>
+          <option value="ln">Lingala</option>
+          <option value="so">Somali</option>
+          <option value="sw">Swahili</option>
+          <option value="wo">Wolof</option>
+          <option value="yo">Yoruba</option>
+          <option value="zu">Zulu</option>
           <option value="ru">Russian</option>
           <option value="tr">Turkish</option>
           <option value="nl">Dutch</option>
@@ -284,7 +299,6 @@ video::cue{background:rgba(0,0,0,.75);color:#fff;font-size:18px;font-family:-app
           <option value="pl">Polish</option>
           <option value="th">Thai</option>
           <option value="vi">Vietnamese</option>
-          <option value="sw">Swahili</option>
         </select>
       </div>
       <button class="btn-go" id="goBtn">▶ Go</button>
@@ -522,7 +536,8 @@ async function startProcessing() {
         const chkData = await chk.json();
         if(!chkData.supported) {
           if(mode === 'download') {
-            showError(chkData.message || 'URL not supported.');
+            const reason = chkData.error ? ` (${chkData.error})` : '';
+            showError(`This URL is not supported for download.${reason}`);
             resetGoBtn(); return;
           } else {
             $('warnText').textContent = '⚠️ ' + (chkData.message || 'This URL is not supported.');
