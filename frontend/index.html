@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediaHub — Video Tools</title>
+<style>
+:root {
+  --bg:#0a0b10;--surface:#13151e;--surface-2:#1a1d2a;--surface-3:#212435;
+  --border:#262a3a;--border-light:#1e2130;
+  --text:#e8eaed;--text-secondary:#9aa0b0;--text-muted:#5a6070;
+  --primary:#6366f1;--primary-hover:#818cf8;--primary-bg:rgba(99,102,241,.08);--primary-border:rgba(99,102,241,.2);
+  --success:#34d399;--success-bg:rgba(52,211,153,.08);
+  --error:#f87171;--error-bg:rgba(248,113,113,.08);
+  --warning:#fbbf24;--warning-bg:rgba(251,191,36,.08);--warning-border:rgba(251,191,36,.2);
+  --radius:14px;--radius-sm:8px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;
+  --font-mono:'SF Mono','Fira Code','Cascadia Code',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+
+/* HEADER */
+.header{padding:20px 32px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:12px}
+.header .logo{font-size:28px}
+.header h1{font-size:20px;font-weight:700;background:linear-gradient(135deg,#6366f1,#a78bfa,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .badge{font-size:11px;padding:2px 8px;background:var(--primary-bg);border:1px solid var(--primary-border);border-radius:20px;color:var(--primary-hover);font-weight:600}
+
+.main{max-width:1100px;margin:0 auto;padding:24px 32px}
+
+/* MODE SELECTOR */
+.mode-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
+.mode-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all .2s;text-align:center}
+.mode-card:hover{border-color:var(--primary-border);background:var(--surface-2)}
+.mode-card.active{border-color:var(--primary);background:var(--primary-bg)}
+.mode-card .mc-icon{font-size:28px;margin-bottom:6px}
+.mode-card .mc-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.mode-card .mc-desc{font-size:11px;color:var(--text-muted);line-height:1.4}
+.mode-card.active .mc-title{color:var(--primary-hover)}
+
+/* INPUT SECTION */
+.input-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+
+/* Source tabs */
+.source-tabs{display:flex;gap:4px;margin-bottom:16px;background:var(--bg);border-radius:var(--radius-sm);padding:4px;border:1px solid var(--border-light)}
+.src-tab{flex:1;padding:8px;background:none;border:none;color:var(--text-muted);font-size:13px;font-weight:500;cursor:pointer;border-radius:6px;font-family:var(--font);transition:all .15s;text-align:center}
+.src-tab.active{background:var(--primary-bg);color:var(--primary-hover)}
+.src-tab:hover:not(.active){color:var(--text-secondary)}
+
+/* URL row */
+.url-row{display:flex;gap:10px;margin-bottom:14px}
+.url-input{flex:1;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;font-family:var(--font);transition:border-color .2s}
+.url-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-bg)}
+.url-input::placeholder{color:var(--text-muted)}
+
+/* Upload zone */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:32px 16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);margin-bottom:14px;display:none}
+.upload-zone.visible{display:block}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--primary);background:var(--primary-bg)}
+.upload-zone.pulse{animation:pulse-border 1.5s ease infinite}
+@keyframes pulse-border{0%,100%{border-color:var(--warning)}50%{border-color:var(--primary)}}
+.upload-zone .uz-icon{font-size:32px;margin-bottom:6px}
+.upload-zone .uz-label{font-size:14px;font-weight:500}
+.upload-zone .uz-hint{font-size:12px;color:var(--text-muted);margin-top:4px}
+.upload-zone input{display:none}
+
+/* File info bar */
+.file-info{display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;align-items:center;gap:10px}
+.file-info.visible{display:flex}
+.fi-icon{font-size:24px}
+.fi-details{flex:1}
+.fi-name{font-weight:600;font-size:13px}
+.fi-size{font-size:11px;color:var(--text-muted)}
+.fi-remove{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:4px 8px;border-radius:4px}
+.fi-remove:hover{color:var(--error);background:var(--error-bg)}
+
+/* Settings row */
+.settings-row{display:flex;gap:10px;align-items:end}
+.field{flex:1}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.field select{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-family:var(--font);appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235a6070'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+.field select:focus{outline:none;border-color:var(--primary)}
+
+.btn-go{padding:10px 28px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:all .15s;height:42px}
+.btn-go:hover:not(:disabled){background:var(--primary-hover);transform:translateY(-1px)}
+.btn-go:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* Warning / Error */
+.warn-box,.error-box{display:none;margin-top:14px;padding:12px 16px;border-radius:var(--radius-sm);font-size:13px;line-height:1.5}
+.warn-box{background:var(--warning-bg);border:1px solid var(--warning-border);color:var(--warning)}
+.error-box{background:var(--error-bg);border:1px solid rgba(248,113,113,.2);color:var(--error)}
+.warn-box.visible,.error-box.visible{display:block}
+.warn-box button{margin-top:8px;padding:6px 14px;background:var(--warning);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)}
+
+/* PROGRESS */
+.progress-section{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px}
+.progress-section.visible{display:block}
+.prog-title{font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text-secondary)}
+.steps{display:flex;gap:6px;margin-bottom:14px}
+.step-pill{flex:1;padding:7px 8px;background:var(--bg);border:1px solid var(--border-light);border-radius:6px;font-size:11px;color:var(--text-muted);text-align:center;transition:all .3s}
+.step-pill.active{border-color:var(--primary-border);background:var(--primary-bg);color:var(--primary-hover)}
+.step-pill.done{border-color:rgba(52,211,153,.2);background:var(--success-bg);color:var(--success)}
+.step-pill.err{border-color:rgba(248,113,113,.2);background:var(--error-bg);color:var(--error)}
+.prog-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--primary),#a78bfa);border-radius:2px;width:0;transition:width .6s ease}
+.prog-status{margin-top:8px;font-size:12px;color:var(--text-muted);font-family:var(--font-mono)}
+
+/* PLAYER SECTION */
+.player-section{display:none;margin-bottom:20px}
+.player-section.visible{display:block}
+.video-container{position:relative;background:#000;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)}
+.video-container video{width:100%;max-height:500px;display:block}
+video::cue{background:rgba(0,0,0,.75);color:#fff;font-size:18px;font-family:-apple-system,sans-serif;line-height:1.4;padding:4px 8px;border-radius:4px}
+.controls-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius)}
+.sub-toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)}
+.toggle-sw{position:relative;width:36px;height:20px;background:var(--border);border-radius:10px;cursor:pointer;transition:background .2s}
+.toggle-sw.on{background:var(--primary)}
+.toggle-sw .knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s}
+.toggle-sw.on .knob{transform:translateX(16px)}
+.dl-btns{display:flex;gap:6px}
+.btn-dl{padding:5px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font);transition:all .15s}
+.btn-dl:hover{border-color:var(--primary);color:var(--primary)}
+.btn-dl.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-dl.primary:hover{background:var(--primary-hover)}
+
+/* DOWNLOAD RESULT */
+.download-result{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;text-align:center;margin-bottom:20px}
+.download-result.visible{display:block}
+.dr-icon{font-size:48px;margin-bottom:10px}
+.dr-title{font-size:18px;font-weight:700;margin-bottom:4px}
+.dr-meta{font-size:13px;color:var(--text-muted);margin-bottom:18px}
+.btn-big-dl{padding:12px 36px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s}
+.btn-big-dl:hover{background:var(--primary-hover);transform:translateY(-1px)}
+
+/* SUMMARY RESULT */
+.summary-result{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+.summary-result.visible{display:block}
+.sum-header{padding:14px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between}
+.sum-header h3{font-size:14px;font-weight:600}
+.sum-body{padding:16px 20px;max-height:400px;overflow-y:auto}
+.sum-section{margin-bottom:16px}
+.sum-section-head{font-size:12px;font-weight:700;color:var(--primary-hover);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.sum-section-head .sum-time{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);font-weight:400}
+.sum-point{font-size:13px;line-height:1.6;color:var(--text);padding:2px 0 2px 16px;border-left:2px solid var(--border)}
+.sum-point+.sum-point{margin-top:6px}
+
+/* TRANSCRIPT PANEL */
+.transcript-panel{display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+.transcript-panel.visible{display:block}
+.tp-header{padding:12px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between}
+.tp-header h3{font-size:14px;font-weight:600}
+.tab-pills{display:flex;gap:4px}
+.tab-pill{padding:5px 12px;background:none;border:1px solid transparent;border-radius:6px;color:var(--text-muted);font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.tab-pill.active{background:var(--primary-bg);border-color:var(--primary-border);color:var(--primary-hover)}
+.tab-pill:hover:not(.active){color:var(--text-secondary)}
+.tp-body{max-height:300px;overflow-y:auto;padding:10px 20px}
+.seg-row{display:flex;gap:10px;padding:7px 8px;border-bottom:1px solid var(--border-light);font-size:13px;line-height:1.5;cursor:pointer;transition:background .1s;border-radius:4px;margin:0 -8px}
+.seg-row:hover{background:var(--surface-2)}
+.seg-row:last-child{border-bottom:none}
+.seg-row .ts{font-family:var(--font-mono);font-size:11px;color:var(--primary);white-space:nowrap;min-width:55px;padding-top:2px}
+.seg-row .txt{color:var(--text);flex:1}
+.seg-row.active-seg{background:var(--primary-bg)}
+
+/* FOOTER */
+.footer-info{margin-top:20px;padding:14px 18px;background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-sm);font-size:12px;color:var(--text-muted);line-height:1.6}
+.footer-info strong{color:var(--text-secondary)}
+
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+@media(max-width:768px){.mode-grid{grid-template-columns:repeat(2,1fr)}.settings-row{flex-direction:column}.url-row{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="logo">🎬</span>
+  <h1>MediaHub</h1>
+  <span class="badge">v2.0</span>
+</div>
+
+<div class="main">
+  <!-- MODE SELECTOR -->
+  <div class="mode-grid" id="modeGrid">
+    <div class="mode-card active" data-mode="translate">
+      <div class="mc-icon">🌍</div>
+      <div class="mc-title">Translate & Subtitle</div>
+      <div class="mc-desc">Transcribe, translate, and add subtitles in another language</div>
+    </div>
+    <div class="mode-card" data-mode="subtitle">
+      <div class="mc-icon">📝</div>
+      <div class="mc-title">Generate Subtitles</div>
+      <div class="mc-desc">Add subtitles in the original language</div>
+    </div>
+    <div class="mode-card" data-mode="download">
+      <div class="mc-icon">📥</div>
+      <div class="mc-title">Download Video</div>
+      <div class="mc-desc">Download video from a supported URL</div>
+    </div>
+    <div class="mode-card" data-mode="summarize">
+      <div class="mc-icon">📋</div>
+      <div class="mc-title">Summarize Video</div>
+      <div class="mc-desc">Get a text summary of the video content</div>
+    </div>
+  </div>
+
+  <!-- INPUT SECTION -->
+  <div class="input-section" id="inputSection">
+    <!-- Source tabs (URL / Upload) -->
+    <div class="source-tabs" id="sourceTabs">
+      <button class="src-tab active" data-src="url">🔗 Paste URL</button>
+      <button class="src-tab" data-src="upload">📁 Upload File</button>
+    </div>
+
+    <!-- URL input -->
+    <div id="urlPanel">
+      <div class="url-row">
+        <input type="text" class="url-input" id="urlInput" placeholder="Paste video URL — Vimeo, Dailymotion, archive.org, or any direct link...">
+      </div>
+    </div>
+
+    <!-- Upload zone -->
+    <div class="upload-zone" id="uploadZone">
+      <div class="uz-icon">📁</div>
+      <div class="uz-label">Drop video or audio file here, or click to browse</div>
+      <div class="uz-hint">Supports MP4, WEBM, MKV, AVI, MOV, MP3, WAV, FLAC, OGG, M4A</div>
+      <input type="file" id="fileInput" accept="video/*,audio/*,.mp4,.webm,.mkv,.avi,.mov,.mp3,.wav,.flac,.ogg,.m4a,.aac,.opus">
+    </div>
+
+    <!-- File info -->
+    <div class="file-info" id="fileInfo">
+      <div class="fi-icon" id="fiIcon">🎬</div>
+      <div class="fi-details">
+        <div class="fi-name" id="fiName"></div>
+        <div class="fi-size" id="fiSize"></div>
+      </div>
+      <button class="fi-remove" id="fiRemove" title="Remove">✕</button>
+    </div>
+
+    <!-- Warnings -->
+    <div class="warn-box" id="warnBox">
+      <span id="warnText"></span>
+      <button id="warnUploadBtn">📁 Upload File Instead</button>
+    </div>
+
+    <!-- Language selectors -->
+    <div class="settings-row" id="langRow">
+      <div class="field" id="srcLangField">
+        <label>Source Language</label>
+        <select id="sourceLang">
+          <option value="auto">Auto-detect</option>
+          <option value="en-US">English</option>
+          <option value="es-US">Spanish</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="it-IT">Italian</option>
+          <option value="pt-BR">Portuguese</option>
+          <option value="ja-JP">Japanese</option>
+          <option value="ko-KR">Korean</option>
+          <option value="zh-CN">Chinese</option>
+          <option value="ar-SA">Arabic</option>
+          <option value="hi-IN">Hindi</option>
+          <option value="ru-RU">Russian</option>
+        </select>
+      </div>
+      <div class="field" id="tgtLangField">
+        <label>Translate To</label>
+        <select id="targetLang">
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ja">Japanese</option>
+          <option value="ko">Korean</option>
+          <option value="zh">Chinese</option>
+          <option value="ar">Arabic</option>
+          <option value="hi">Hindi</option>
+          <option value="am">Amharic</option>
+          <option value="ru">Russian</option>
+          <option value="tr">Turkish</option>
+          <option value="nl">Dutch</option>
+          <option value="sv">Swedish</option>
+          <option value="pl">Polish</option>
+          <option value="th">Thai</option>
+          <option value="vi">Vietnamese</option>
+          <option value="sw">Swahili</option>
+        </select>
+      </div>
+      <button class="btn-go" id="goBtn">▶ Go</button>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-section" id="progressSection">
+    <div class="prog-title" id="progTitle">Processing...</div>
+    <div class="steps" id="stepsContainer"></div>
+    <div class="prog-track"><div class="prog-fill" id="progBar"></div></div>
+    <div class="prog-status" id="progStatus">Initializing...</div>
+  </div>
+
+  <!-- VIDEO PLAYER -->
+  <div class="player-section" id="playerSection">
+    <div class="video-container">
+      <video id="videoPlayer" controls crossorigin="anonymous">
+        <track id="subTrack" kind="subtitles" label="Subtitles" default>
+      </video>
+    </div>
+    <div class="controls-bar">
+      <div class="sub-toggle">
+        <div class="toggle-sw on" id="subToggle"><div class="knob"></div></div>
+        <span>Subtitles</span>
+      </div>
+      <div class="dl-btns" id="subDlBtns">
+        <button class="btn-dl" id="dlSrt">⬇ .SRT</button>
+        <button class="btn-dl primary" id="dlVtt">⬇ .VTT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD RESULT -->
+  <div class="download-result" id="downloadResult">
+    <div class="dr-icon">✅</div>
+    <div class="dr-title" id="drTitle">Video Ready</div>
+    <div class="dr-meta" id="drMeta"></div>
+    <button class="btn-big-dl" id="drBtn">⬇ Download Video</button>
+  </div>
+
+  <!-- SUMMARY RESULT -->
+  <div class="summary-result" id="summaryResult">
+    <div class="sum-header">
+      <h3>📋 Summary</h3>
+      <button class="btn-dl" id="dlSummary">⬇ .TXT</button>
+    </div>
+    <div class="sum-body" id="sumBody"></div>
+  </div>
+
+  <!-- TRANSCRIPT PANEL -->
+  <div class="transcript-panel" id="transcriptPanel">
+    <div class="tp-header">
+      <h3>📜 Transcript</h3>
+      <div class="tab-pills" id="tpTabs"></div>
+    </div>
+    <div class="tp-body" id="tpBody"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-info">
+    <strong>Supported URL sites:</strong> Vimeo, Dailymotion, Bilibili, Archive.org, Rumble, Odysee,
+    Reddit, Twitter/X, TikTok, and <strong>1,800+ more</strong> via yt-dlp.
+    <strong>File upload:</strong> MP4, WEBM, MKV, AVI, MOV, MP3, WAV, FLAC, OGG, M4A.
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+let currentMode = 'translate';
+let currentSource = 'url'; // 'url' or 'upload'
+let uploadId = null;
+let uploadFilename = null;
+let currentJobId = null;
+let pollTimer = null;
+let transcriptCache = null;
+let activeTranscriptSegments = [];
+let activeSegmentIndex = -1;
+const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
+const apiUrl = path => `${API_BASE}${path}`;
+
+// ============ DOM ============
+const $ = id => document.getElementById(id);
+const urlInput = $('urlInput');
+const goBtn = $('goBtn');
+const uploadZone = $('uploadZone');
+const fileInput = $('fileInput');
+const fileInfo = $('fileInfo');
+const warnBox = $('warnBox');
+const errorBox = $('errorBox');
+const progressSection = $('progressSection');
+const progBar = $('progBar');
+const progStatus = $('progStatus');
+const playerSection = $('playerSection');
+const videoPlayer = $('videoPlayer');
+const subTrack = $('subTrack');
+const downloadResult = $('downloadResult');
+const summaryResult = $('summaryResult');
+const transcriptPanel = $('transcriptPanel');
+
+// ============ MODE SELECTOR ============
+document.querySelectorAll('.mode-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    currentMode = card.dataset.mode;
+    updateUIForMode();
+    hideResults();
+  });
+});
+
+function updateUIForMode() {
+  const m = currentMode;
+  // Source tabs: hide upload tab for download mode
+  $('sourceTabs').style.display = m === 'download' ? 'none' : '';
+  if (m === 'download') { switchSource('url'); }
+  // Language fields
+  $('srcLangField').style.display = (m === 'download') ? 'none' : '';
+  $('tgtLangField').style.display = (m === 'translate') ? '' : 'none';
+  // Button label
+  const labels = { translate: '🌍 Translate', subtitle: '📝 Generate Subtitles', download: '📥 Download', summarize: '📋 Summarize' };
+  goBtn.textContent = labels[m] || '▶ Go';
+}
+
+// ============ SOURCE TABS ============
+document.querySelectorAll('.src-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.src-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    switchSource(tab.dataset.src);
+  });
+});
+
+function switchSource(src) {
+  currentSource = src;
+  $('urlPanel').style.display = src === 'url' ? '' : 'none';
+  uploadZone.style.display = src === 'upload' ? 'block' : 'none';
+  uploadZone.classList.remove('pulse');
+  warnBox.classList.remove('visible');
+}
+
+// ============ FILE UPLOAD ============
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('dragover'); if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files.length) handleFile(fileInput.files[0]); });
+
+$('fiRemove').addEventListener('click', () => {
+  uploadId = null; uploadFilename = null;
+  fileInfo.classList.remove('visible');
+  uploadZone.style.display = currentSource === 'upload' ? 'block' : 'none';
+});
+
+async function handleFile(file) {
+  const isVid = file.type.startsWith('video');
+  $('fiIcon').textContent = isVid ? '🎬' : '🎵';
+  $('fiName').textContent = file.name;
+  $('fiSize').textContent = formatSize(file.size);
+  fileInfo.classList.add('visible');
+  uploadZone.style.display = 'none';
+  uploadFilename = file.name;
+
+  // Upload to server
+  $('fiSize').textContent = 'Uploading...';
+  goBtn.disabled = true;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const resp = await fetch(apiUrl('/api/upload'), { method: 'POST', body: form });
+    if(!resp.ok) {
+      let msg = 'Upload failed';
+      try {
+        const errData = await resp.json();
+        msg = errData.detail || msg;
+      } catch(e) {}
+      throw new Error(msg);
+    }
+    const data = await resp.json();
+    uploadId = data.upload_id;
+    $('fiSize').textContent = `${formatSize(data.size)} · ${data.type}`;
+    goBtn.disabled = false;
+  } catch(err) {
+    showError('File upload failed: ' + err.message);
+    fileInfo.classList.remove('visible');
+    uploadZone.style.display = 'block';
+    goBtn.disabled = false;
+  }
+}
+
+function formatSize(b) {
+  if(b<1024) return b+' B';
+  if(b<1048576) return (b/1024).toFixed(1)+' KB';
+  if(b<1073741824) return (b/1048576).toFixed(1)+' MB';
+  return (b/1073741824).toFixed(2)+' GB';
+}
+
+// ============ WARN → UPLOAD ============
+$('warnUploadBtn').addEventListener('click', () => {
+  document.querySelectorAll('.src-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.src-tab[data-src="upload"]').classList.add('active');
+  switchSource('upload');
+  uploadZone.classList.add('pulse');
+  warnBox.classList.remove('visible');
+});
+
+// ============ GO BUTTON ============
+goBtn.addEventListener('click', startProcessing);
+urlInput.addEventListener('keydown', e => { if(e.key==='Enter') startProcessing(); });
+
+async function startProcessing() {
+  hideResults();
+  errorBox.classList.remove('visible');
+  warnBox.classList.remove('visible');
+
+  const mode = currentMode;
+  let url = null;
+  let upId = null;
+
+  if(currentSource === 'url') {
+    url = urlInput.value.trim();
+    if(!url) { showError('Please enter a URL.'); return; }
+
+    // Validate URL first (except for direct file URLs)
+    if(mode !== 'download' || true) {
+      goBtn.disabled = true;
+      goBtn.textContent = '⏳ Checking...';
+      try {
+        const chk = await fetch(apiUrl('/api/check-url'), {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({url})
+        });
+        const chkData = await chk.json();
+        if(!chkData.supported) {
+          if(mode === 'download') {
+            showError(chkData.message || 'URL not supported.');
+            resetGoBtn(); return;
+          } else {
+            $('warnText').textContent = '⚠️ ' + (chkData.message || 'This URL is not supported.');
+            warnBox.classList.add('visible');
+            resetGoBtn(); return;
+          }
+        }
+      } catch(e) { /* proceed anyway */ }
+      resetGoBtn();
+    }
+  } else {
+    if(!uploadId) { showError('Please upload a file first.'); return; }
+    upId = uploadId;
+  }
+
+  // Start processing
+  goBtn.disabled = true;
+  goBtn.textContent = '⏳ Processing...';
+  showProgress(mode);
+
+  try {
+    const body = {
+      mode: mode,
+      source_language: $('sourceLang').value,
+      target_language: $('targetLang').value,
+    };
+    if(url) body.url = url;
+    if(upId) body.upload_id = upId;
+
+    const resp = await fetch(apiUrl('/api/process'), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if(!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Server error'); }
+    const data = await resp.json();
+    currentJobId = data.job_id;
+    pollTimer = setInterval(pollStatus, 2000);
+    pollStatus();
+  } catch(err) {
+    showError(err.message);
+    resetGoBtn();
+    progressSection.classList.remove('visible');
+  }
+}
+
+async function pollStatus() {
+  if(!currentJobId) return;
+  try {
+    const resp = await fetch(apiUrl(`/api/status/${currentJobId}`));
+    const data = await resp.json();
+    updateProgress(data);
+    if(data.status === 'complete') { clearInterval(pollTimer); onComplete(data); }
+    else if(data.status === 'error') { clearInterval(pollTimer); showError(data.error||'Unknown error'); resetGoBtn(); }
+  } catch(e) { console.error('Poll error:',e); }
+}
+
+// ============ PROGRESS ============
+const STEPS_MAP = {
+  translate: [
+    {id:'extracting', label:'🔗 Extract'},
+    {id:'transcribing', label:'🎙️ Transcribe'},
+    {id:'translating', label:'🌍 Translate'},
+    {id:'generating', label:'📝 Subtitles'}
+  ],
+  subtitle: [
+    {id:'extracting', label:'🔗 Extract'},
+    {id:'transcribing', label:'🎙️ Transcribe'},
+    {id:'generating', label:'📝 Subtitles'}
+  ],
+  download: [
+    {id:'checking', label:'🔍 Checking'},
+    {id:'downloading', label:'📥 Downloading'}
+  ],
+  summarize: [
+    {id:'extracting', label:'🔗 Extract'},
+    {id:'transcribing', label:'🎙️ Transcribe'},
+    {id:'summarizing', label:'📋 Summarize'}
+  ],
+};
+
+const STATUS_LABELS = {
+  pending:'Initializing...',extracting:'🔗 Extracting media...',
+  transcribing:'🎙️ Transcribing audio...',translating:'🌍 Translating...',
+  generating:'📝 Generating files...',checking:'🔍 Checking URL...',
+  downloading:'📥 Downloading video...',summarizing:'📋 Generating summary...',
+  complete:'✅ Done!',error:'❌ Error'
+};
+
+function showProgress(mode) {
+  const steps = STEPS_MAP[mode] || [];
+  const container = $('stepsContainer');
+  container.innerHTML = '';
+  steps.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'step-pill';
+    div.id = 'pill-' + s.id;
+    div.textContent = s.label;
+    container.appendChild(div);
+  });
+  progBar.style.width = '0%';
+  progStatus.textContent = 'Initializing...';
+  progressSection.classList.add('visible');
+}
+
+function updateProgress(data) {
+  progBar.style.width = data.progress + '%';
+  progStatus.textContent = STATUS_LABELS[data.status] || data.status;
+  const steps = STEPS_MAP[data.mode || currentMode] || [];
+  const ids = steps.map(s => s.id);
+  const curIdx = ids.indexOf(data.status);
+  ids.forEach((id, i) => {
+    const pill = document.getElementById('pill-' + id);
+    if(!pill) return;
+    if(data.status === 'complete') pill.className = 'step-pill done';
+    else if(data.status === 'error') { if(i <= curIdx) pill.className = 'step-pill err'; }
+    else if(i < curIdx) pill.className = 'step-pill done';
+    else if(i === curIdx) pill.className = 'step-pill active';
+    else pill.className = 'step-pill';
+  });
+}
+
+// ============ COMPLETE ============
+function onComplete(data) {
+  resetGoBtn();
+  const mode = data.mode || currentMode;
+  transcriptCache = data.transcript;
+
+  if(mode === 'download') {
+    showDownloadResult(data);
+  } else if(mode === 'summarize') {
+    showSummaryResult(data);
+    if(data.video_url) showVideoPlayer(data.video_url, null);
+    if(data.transcript) showTranscript(data.transcript, false);
+  } else {
+    // translate or subtitle
+    if(data.video_url) showVideoPlayer(data.video_url, data.subtitle_url);
+    if(data.transcript) showTranscript(data.transcript, mode === 'translate');
+  }
+}
+
+function showVideoPlayer(videoUrl, subtitleUrl) {
+  videoPlayer.src = apiUrl(videoUrl);
+  if(subtitleUrl) {
+    subTrack.src = apiUrl(subtitleUrl);
+    subTrack.label = currentMode === 'translate' ? 'Translated' : 'Subtitles';
+    $('subDlBtns').style.display = '';
+    document.querySelector('.sub-toggle').style.display = '';
+  } else {
+    subTrack.removeAttribute('src');
+    $('subDlBtns').style.display = 'none';
+    document.querySelector('.sub-toggle').style.display = 'none';
+  }
+  playerSection.classList.add('visible');
+  videoPlayer.addEventListener('loadedmetadata', () => {
+    if(videoPlayer.textTracks.length > 0) videoPlayer.textTracks[0].mode = 'showing';
+  }, {once:true});
+}
+
+function showDownloadResult(data) {
+  const info = data.download_info || {};
+  $('drTitle').textContent = info.title || 'Video Ready';
+  const parts = [];
+  if(info.duration) parts.push(fmtDur(info.duration));
+  if(info.size) parts.push(formatSize(info.size));
+  $('drMeta').textContent = parts.join(' · ') || '';
+  $('drBtn').onclick = () => window.open(apiUrl(info.download_url || `/api/download/${currentJobId}`));
+  downloadResult.classList.add('visible');
+}
+
+function showSummaryResult(data) {
+  const sum = data.summary || {};
+  const body = $('sumBody');
+  body.innerHTML = '';
+  (sum.sections || []).forEach(sec => {
+    const div = document.createElement('div');
+    div.className = 'sum-section';
+    div.innerHTML = `<div class="sum-section-head">📌 ${esc(sec.label)} <span class="sum-time">${esc(sec.time_range)}</span></div>`;
+    (sec.key_points || []).forEach(pt => {
+      const p = document.createElement('div');
+      p.className = 'sum-point';
+      p.textContent = pt;
+      div.appendChild(p);
+    });
+    body.appendChild(div);
+  });
+  summaryResult.classList.add('visible');
+}
+
+function showTranscript(transcript, showTranslated) {
+  const tpTabs = $('tpTabs');
+  tpTabs.innerHTML = '';
+  if(showTranslated && transcript.translated) {
+    tpTabs.innerHTML = '<button class="tab-pill active" data-tab="translated">Translated</button><button class="tab-pill" data-tab="original">Original</button>';
+  } else {
+    tpTabs.innerHTML = '<button class="tab-pill active" data-tab="original">Original</button>';
+  }
+  tpTabs.querySelectorAll('.tab-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tpTabs.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderSegments(transcript[btn.dataset.tab] || transcript.original);
+    });
+  });
+  const firstTab = showTranslated && transcript.translated ? 'translated' : 'original';
+  renderSegments(transcript[firstTab] || transcript.original);
+  transcriptPanel.classList.add('visible');
+}
+
+function renderSegments(segs) {
+  const body = $('tpBody');
+  activeTranscriptSegments = segs || [];
+  activeSegmentIndex = -1;
+  body.innerHTML = '';
+  body.scrollTop = 0;
+  activeTranscriptSegments.forEach(seg => {
+    const row = document.createElement('div');
+    row.className = 'seg-row';
+    row.innerHTML = `<span class="ts">${fmtTs(seg.start)}</span><span class="txt">${esc(seg.text)}</span>`;
+    row.addEventListener('click', () => { videoPlayer.currentTime = seg.start; videoPlayer.play(); });
+    body.appendChild(row);
+  });
+}
+
+// ============ HELPERS ============
+function hideResults() {
+  playerSection.classList.remove('visible');
+  downloadResult.classList.remove('visible');
+  summaryResult.classList.remove('visible');
+  transcriptPanel.classList.remove('visible');
+  progressSection.classList.remove('visible');
+}
+
+function showError(msg) { errorBox.textContent = '⚠️ ' + msg; errorBox.classList.add('visible'); progressSection.classList.remove('visible'); }
+function resetGoBtn() {
+  goBtn.disabled = false;
+  updateUIForMode();
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtTs(s) { const m=Math.floor(s/60),sec=Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`; }
+function fmtDur(s) { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=Math.floor(s%60); return h>0?`${h}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`:`${m}:${sec.toString().padStart(2,'0')}`; }
+
+// Downloads
+$('dlVtt').addEventListener('click', () => { if(currentJobId) window.open(apiUrl(`/api/subtitles/${currentJobId}.vtt`)); });
+$('dlSrt').addEventListener('click', () => { if(currentJobId) window.open(apiUrl(`/api/subtitles/${currentJobId}.srt`)); });
+$('dlSummary').addEventListener('click', () => { if(currentJobId) window.open(apiUrl(`/api/summary/${currentJobId}.txt`)); });
+
+// Subtitle toggle
+$('subToggle').addEventListener('click', function() {
+  this.classList.toggle('on');
+  if(videoPlayer.textTracks.length > 0) videoPlayer.textTracks[0].mode = this.classList.contains('on') ? 'showing' : 'hidden';
+});
+
+// Track video time → highlight transcript
+videoPlayer.addEventListener('timeupdate', () => {
+  const t = videoPlayer.currentTime;
+  const nextIndex = activeTranscriptSegments.findIndex(seg => t >= seg.start && t < seg.end);
+  if(nextIndex === activeSegmentIndex) return;
+
+  const body = $('tpBody');
+  const rows = body.querySelectorAll('.seg-row');
+  if(rows[activeSegmentIndex]) rows[activeSegmentIndex].classList.remove('active-seg');
+  activeSegmentIndex = nextIndex;
+  if(!rows[activeSegmentIndex]) return;
+
+  const row = rows[activeSegmentIndex];
+  row.classList.add('active-seg');
+
+  const bodyRect = body.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  if(rowRect.top < bodyRect.top) {
+    body.scrollTop -= bodyRect.top - rowRect.top;
+  } else if(rowRect.bottom > bodyRect.bottom) {
+    body.scrollTop += rowRect.bottom - bodyRect.bottom;
+  }
+});
+
+// Init
+updateUIForMode();
+</script>
+</body>
+</html>
